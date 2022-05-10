@@ -16,7 +16,8 @@ TestEnum.NodeType = {
 	BeforeAll = "BeforeAll",
 	AfterAll = "AfterAll",
 	BeforeEach = "BeforeEach",
-	AfterEach = "AfterEach"
+	AfterEach = "AfterEach",
+	WrapEach = "WrapEach"
 }
 
 TestEnum.NodeModifier = {

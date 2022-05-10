@@ -52,7 +52,7 @@ end
 	session to store all of the results.
 ]]
 function TestRunner.runPlanNode(session, planNode, lifecycleHooks)
-	local function runCallback(callback, messagePrefix)
+	local function runCallback(callback, messagePrefix, ...)
 		local success = true
 		local errorMessage
 		-- Any code can check RUNNING_GLOBAL to fork behavior based on
@@ -81,25 +81,36 @@ function TestRunner.runPlanNode(session, planNode, lifecycleHooks)
 
 		local context = session:getContext()
 
-		local nodeSuccess, nodeResult = xpcall(
-			function()
-				callback(context)
+		local nodeResult = table.pack(xpcall(
+			function(...)
+				return callback(context, ...)
 			end,
 			function(message)
 				return messagePrefix .. debug.traceback(tostring(message), 2)
-			end
-		)
+			end,
+			...
+		))
+
+		local result
+		local nodeSuccess = nodeResult[1]
 
 		-- If a node threw an error, we prefer to use that message over
 		-- one created by fail() if it was set.
 		if not nodeSuccess then
-			success = false
-			errorMessage = nodeResult
+			result = {
+				success = false,
+				error = nodeResult[2]
+			}
+		else
+			result = {
+				success = true,
+				returns = table.pack(unpack(nodeResult, 2, nodeResult.n))
+			}
 		end
 
 		_G[RUNNING_GLOBAL] = nil
 
-		return success, errorMessage
+		return result
 	end
 
 	local function runNode(childPlanNode)
@@ -107,26 +118,38 @@ function TestRunner.runPlanNode(session, planNode, lifecycleHooks)
 		-- by a test calling fail([message]).
 
 		for _, hook in ipairs(lifecycleHooks:getBeforeEachHooks()) do
-			local success, errorMessage = runCallback(hook, "beforeEach hook: ")
-			if not success then
-				return false, errorMessage
+			local result = runCallback(hook, "beforeEach hook: ")
+			if not result.success then
+				return false, result.error
 			end
 		end
 
-		local testSuccess, testErrorMessage = runCallback(childPlanNode.callback)
+		local callback = childPlanNode.callback
+		for _, hook in ipairs(lifecycleHooks:getWrapEachHooks()) do
+			local result = runCallback(hook, nil, callback)
+			if not result.success then
+				return false, result.error
+			elseif typeof(result.returns[1]) ~= "function" then
+				return false, "expected wrapEach to return a function, but instead it returned " .. typeof(result.returns[1])
+			else
+				callback = result.returns[1]
+			end
+		end
+
+		local testResult = runCallback(callback)
 
 		for _, hook in ipairs(lifecycleHooks:getAfterEachHooks()) do
-			local success, errorMessage = runCallback(hook, "afterEach hook: ")
-			if not success then
-				if not testSuccess then
-					return false, testErrorMessage .. "\nWhile cleaning up the failed test another error was found:\n" .. errorMessage
+			local result = runCallback(hook, "afterEach hook: ")
+			if not result.success then
+				if not testResult.success then
+					return false, testResult.error .. "\nWhile cleaning up the failed test another error was found:\n" .. result.error
 				end
-				return false, errorMessage
+				return false, result.error
 			end
 		end
 
-		if not testSuccess then
-			return false, testErrorMessage
+		if not testResult.success then
+			return false, testResult.error
 		end
 
 		return true, nil
@@ -136,9 +159,9 @@ function TestRunner.runPlanNode(session, planNode, lifecycleHooks)
 
 	local halt = false
 	for _, hook in ipairs(lifecycleHooks:getBeforeAllHooks()) do
-		local success, errorMessage = runCallback(hook, "beforeAll hook: ")
-		if not success then
-			session:addDummyError("beforeAll", errorMessage)
+		local result = runCallback(hook, "beforeAll hook: ")
+		if not result.success then
+			session:addDummyError("beforeAll", result.error)
 			halt = true
 		end
 	end
@@ -176,9 +199,9 @@ function TestRunner.runPlanNode(session, planNode, lifecycleHooks)
 	end
 
 	for _, hook in ipairs(lifecycleHooks:getAfterAllHooks()) do
-		local success, errorMessage = runCallback(hook, "afterAll hook: ")
-		if not success then
-			session:addDummyError("afterAll", errorMessage)
+		local result = runCallback(hook, "afterAll hook: ")
+		if not result.success then
+			session:addDummyError("afterAll", result.error)
 		end
 	end
 

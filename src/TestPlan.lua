@@ -67,7 +67,8 @@ local function newEnvironment(currentNode, extraEnvironment)
 		[TestEnum.NodeType.BeforeAll] = "beforeAll",
 		[TestEnum.NodeType.AfterAll] = "afterAll",
 		[TestEnum.NodeType.BeforeEach] = "beforeEach",
-		[TestEnum.NodeType.AfterEach] = "afterEach"
+		[TestEnum.NodeType.AfterEach] = "afterEach",
+		[TestEnum.NodeType.WrapEach] = "wrapEach",
 	}
 
 	for nodeType, name in pairs(lifecycleHooks) do

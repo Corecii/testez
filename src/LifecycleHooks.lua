@@ -43,6 +43,22 @@ function LifecycleHooks:getAfterEachHooks()
 end
 
 --[[
+	Returns an array of `wrapEach` hooks in FILO order
+]]
+function LifecycleHooks:getWrapEachHooks()
+	local key = TestEnum.NodeType.WrapEach
+	local hooks = {}
+
+	for _, level in ipairs(self._stack) do
+		for _, hook in ipairs(level[key]) do
+			table.insert(hooks, 1, hook)
+		end
+	end
+
+	return hooks
+end
+
+--[[
 	Pushes uncalled beforeAll and afterAll hooks back up the stack
 ]]
 function LifecycleHooks:popHooks()
@@ -57,6 +73,7 @@ function LifecycleHooks:pushHooksFrom(planNode)
 		[TestEnum.NodeType.AfterAll] = self:_getHooksOfType(planNode.children, TestEnum.NodeType.AfterAll),
 		[TestEnum.NodeType.BeforeEach] = self:_getHooksOfType(planNode.children, TestEnum.NodeType.BeforeEach),
 		[TestEnum.NodeType.AfterEach] = self:_getHooksOfType(planNode.children, TestEnum.NodeType.AfterEach),
+		[TestEnum.NodeType.WrapEach] = self:_getHooksOfType(planNode.children, TestEnum.NodeType.WrapEach),
 	})
 end
 
