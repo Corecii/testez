@@ -1,6 +1,6 @@
 [package]
-name = "roblox/testez"
-version = "0.4.1"
+name = "corecii/testez"
+version = "0.4.1-wrapeach"
 license = "Apache2"
 registry = "https://github.com/UpliftGames/wally-index"
 realm = "shared"
